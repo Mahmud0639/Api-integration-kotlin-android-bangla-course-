@@ -37,6 +37,9 @@ class StudentsDetailsActivity : AppCompatActivity() {
         binding.userEmailET.setText(stu?.email)
         binding.userMobileET.setText(stu?.phone)
 
+        val credits = stu?.totalCredits.toString()
+        binding.creditET.setText(credits)
+
 
 
         val subjects = arrayListOf<String>()
