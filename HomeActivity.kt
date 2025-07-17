@@ -42,7 +42,7 @@ class HomeActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
-            val result = RetrofitClient.retrofit.getStudents(1, 5)
+            val result = RetrofitClient.retrofit.getStudents(1, 10)
             Log.d("Ret_Data", "onCreate: $result")
             Toast.makeText(this@HomeActivity,"data is: ${result[0].projectTitle}",Toast.LENGTH_SHORT).show()
 
