@@ -19,10 +19,16 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var studentsAdapter: StudentsAdapter
     private var studentsList: ArrayList<Students> = arrayListOf()
 
+    companion object {
+        var shouldRefresh = false
+    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
 
 
         studentsAdapter = StudentsAdapter(studentsList)
@@ -41,15 +47,42 @@ class HomeActivity : AppCompatActivity() {
             startActivity(Intent(this,InsertStudent::class.java))
         }
 
-        lifecycleScope.launch {
-            val result = RetrofitClient.retrofit.getStudents(1, 10)
-            Log.d("Ret_Data", "onCreate: $result")
-            Toast.makeText(this@HomeActivity,"data is: ${result[0].projectTitle}",Toast.LENGTH_SHORT).show()
+//        lifecycleScope.launch {
+//            val result = RetrofitClient.retrofit.getStudents(1, 10)
+//            Log.d("Ret_Data", "onCreate: $result")
+//            Toast.makeText(this@HomeActivity,"data is: ${result[0].projectTitle}",Toast.LENGTH_SHORT).show()
+//
+//            studentsList.clear()
+//            studentsList.addAll(result)
+//            studentsAdapter.notifyDataSetChanged()
+//        }
 
-            studentsList.clear()
-            studentsList.addAll(result)
-            studentsAdapter.notifyDataSetChanged()
+        loadStudents()
+
+    }
+
+    private fun loadStudents() {
+        lifecycleScope.launch {
+            try {
+                val result = RetrofitClient.retrofit.getStudents(1, 50)
+                Log.d("Ret_Data", "onStart: $result")
+                studentsList.clear()
+                studentsList.addAll(result)
+                studentsAdapter.notifyDataSetChanged()
+            } catch (e: Exception) {
+                Toast.makeText(this@HomeActivity, "Failed to load data", Toast.LENGTH_SHORT).show()
+                Log.e("API_ERROR", "Error fetching data", e)
+            }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (shouldRefresh){ //eta korle jokhon app first time open hoy tokhon jeno onStart method notun kore loadStudents again call na hoy
+            loadStudents()
+            shouldRefresh = false
         }
 
     }
+
 }

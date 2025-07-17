@@ -192,7 +192,7 @@ class InsertStudent : AppCompatActivity() {
 
 
             saveInfo(userName,userEmail,userPhone,credits.toInt(),selected,selectedIds.toTypedArray(),proTitle,proDesc,mProfileUri!!, success = {
-                    Toast.makeText(this@InsertStudent,"${it.Result}",Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@InsertStudent,"${it.Result}",Toast.LENGTH_SHORT).show()
             }, saveSuccess = {
                 Toast.makeText(this@InsertStudent,"${it.Result}",Toast.LENGTH_SHORT).show()
             })
@@ -210,11 +210,21 @@ class InsertStudent : AppCompatActivity() {
 
         //students_profile
 
+        val mapData = HashMap<String,Any>().apply {
+            put("name",mName)
+            put("email",mEmail)
+            put("phone",mPhone)
+            put("total_credits",totCredit)
+            put("dept_name",mDept)
+            put("subjects",mSubjects)
+        }
+
         val formData = MultipartBody.Builder().apply {
             setType(MultipartBody.FORM)//kon type er input..form naki raw
 
             addFormDataPart("title",proTitle)
             addFormDataPart("description",proDesc)
+            addFormDataPart("profile_id", "")
 
             val profileFile = mProfile?.let {
                 File(it)
@@ -279,25 +289,32 @@ class InsertStudent : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                val uploadResponse:ResultResponse = RetrofitClient.retrofit.uploadFile(formData.parts())
 
-
-                val mapData = HashMap<String,Any>().apply {
-                    put("name",mName)
-                    put("email",mEmail)
-                    put("phone",mPhone)
-                    put("total_credits",totCredit)
-                    put("dept_name",mDept)
-                    put("subjects",mSubjects)
+                val parts = formData.parts()
+                Log.d("DEBUG", "Multipart parts count: ${parts.size}")
+                parts.forEachIndexed { index, part ->
+                    Log.d("DEBUG", "Part $index: $part")
                 }
 
+
+
                 val saveResponse = RetrofitClient.retrofit.saveStudents(mapData)
+                Log.d("DEBUG", "After saveStudents: $saveResponse")
+
                 saveSuccess(saveResponse)
 
+                Toast.makeText(this@InsertStudent,"Call here",Toast.LENGTH_SHORT).show()
+                Log.d("DEBUG", "Before uploadFile")
+                val uploadResponse = RetrofitClient.retrofit.uploadFile(formData.parts())
+                Log.d("DEBUG", "After uploadFile: $uploadResponse")
 
-                success(uploadResponse)
+
+           success(uploadResponse)
+
+                HomeActivity.shouldRefresh = true
+
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("UPLOAD", "Error in upload or save: ${e.message}", e)
             }
         }
     }

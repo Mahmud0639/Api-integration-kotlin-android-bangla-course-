@@ -1,18 +1,37 @@
 package com.manuni.hello_world.api_integration
 
+import android.app.Activity
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
+import android.util.Log
+import android.view.View
 import android.widget.ArrayAdapter
+import android.widget.Toast
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.github.dhaval2404.imagepicker.ImagePicker
 import com.manuni.hello_world.R
 import com.manuni.hello_world.api_integration.api.ApiEndPoints
+import com.manuni.hello_world.api_integration.api.ProgressTracker
+import com.manuni.hello_world.api_integration.api.RetrofitClient
+import com.manuni.hello_world.api_integration.models.ResultResponse
 import com.manuni.hello_world.api_integration.models.Students
+import com.manuni.hello_world.api_integration.models.Subjects
 import com.manuni.hello_world.databinding.ActivityStudentsDetailsBinding
 import com.squareup.picasso.Picasso
+import kotlinx.coroutines.launch
+import okhttp3.MultipartBody
+import java.io.File
 
 class StudentsDetailsActivity : AppCompatActivity() {
     private lateinit var binding: ActivityStudentsDetailsBinding
+    private var mProfileUri:String? = ""
+    private var mPic:String? = ""
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,6 +44,9 @@ class StudentsDetailsActivity : AppCompatActivity() {
         // val studentData = intent.getParcelableExtra<Students>("STUDENTS")
         //val studentData = intent.getParcelableExtra("STUDENTS") as Students?
         val stu = intent.getParcelableExtra("STUDENTS", Students::class.java)
+
+        mPic = stu?.imageUrl
+
 
 
 
@@ -72,5 +94,388 @@ class StudentsDetailsActivity : AppCompatActivity() {
         }
 
 
+        //image picking
+        binding.pickImage.setOnClickListener{
+            ImagePicker.with(this@StudentsDetailsActivity)
+                .crop()
+                .compress(1024)
+                .maxResultSize(512, 512)
+                .createIntent { intent ->
+                    startForProfileImageResult.launch(intent)
+                }
+        }
+
+        var proTitle = ""
+        var proDesc = ""
+        var userName = ""
+        var userEmail = ""
+        var userPhone = ""
+        var earnedCredit = ""
+        binding.updateBtn.setOnClickListener {
+            if (mProfileUri == null){
+                return@setOnClickListener
+            }
+
+            if (binding.projectTitle.text.isNullOrEmpty()){
+                binding.projectTitle.error = "Field can't be empty."
+                return@setOnClickListener
+            }else{
+                proTitle = binding.projectTitle.text.toString().trim()
+                binding.projectTitle.error = null
+            }
+
+            if (binding.proDescription.text.isNullOrEmpty()){
+                binding.proDescription.error = "Field can't be empty."
+                return@setOnClickListener
+            }else{
+                proDesc = binding.proDescription.text.toString().trim()
+                binding.projectTitle.error = null
+            }
+
+            if (binding.userNameET.text.isNullOrEmpty()){
+                binding.userNameET.error = "Field can't be empty."
+                return@setOnClickListener
+            }else{
+                userName = binding.userNameET.text.toString().trim()
+                binding.projectTitle.error = null
+            }
+
+            if (binding.userEmailET.text.isNullOrEmpty()){
+                binding.userEmailET.error = "Field can't be empty."
+                return@setOnClickListener
+            }else{
+                userEmail = binding.userEmailET.text.toString().trim()
+                binding.projectTitle.error = null
+            }
+
+            if (binding.userMobileET.text.isNullOrEmpty()){
+                binding.userMobileET.error = "Field can't be empty."
+                return@setOnClickListener
+            }else{
+                userPhone = binding.userMobileET.text.toString().trim()
+                binding.projectTitle.error = null
+            }
+
+            if (binding.creditET.text.isNullOrEmpty()){
+                binding.creditET.error = "Field can't be empty."
+                return@setOnClickListener
+            }else{
+                earnedCredit = binding.creditET.text.toString().trim()
+
+                binding.creditET.error = null
+            }
+            val subIds = stu?.subjects?.mapNotNull {
+                it.subjectId
+            }
+            Toast.makeText(this@StudentsDetailsActivity,"$subIds-$mProfileUri-$proTitle-$proDesc-$userName-$userEmail-$userPhone-$credits",Toast.LENGTH_SHORT).show()
+
+            Log.d("RES", "onCreate:${subIds}- $mProfileUri-$proTitle-$proDesc-$userName-$userEmail-$userPhone-$credits-${stu?.studentId}-${stu?.profileId}")
+
+
+
+
+            updateInfo(stu?.studentId,stu?.profileId,userName,userEmail,userPhone,earnedCredit.toInt(),stu?.departments?.deptName,subIds,proTitle,proDesc,mProfileUri, success = {
+                Toast.makeText(this@StudentsDetailsActivity,"Success",Toast.LENGTH_SHORT).show()
+            }, saveSuccess = {
+                Toast.makeText(this@StudentsDetailsActivity,"Save Success",Toast.LENGTH_SHORT).show()
+            })
+        }
+
+    }
+    private fun updateInfo(
+        stId: Int?,
+        profileId: String?,
+        mName: String,
+        mEmail: String,
+        mPhone: String,
+        totCredit: Int,
+        mDept: String?,
+        subjects: List<Int>?,
+        proTitle: String,
+        proDesc: String,
+        mProfile: String?,
+        success: (ResultResponse) -> Unit,
+        saveSuccess: (ResultResponse) -> Unit
+    ) {
+        binding.progressBar.visibility = View.VISIBLE
+        binding.progressValue.visibility = View.VISIBLE
+
+        val isLocalFile = mProfileUri?.startsWith("/storage") == true || mProfileUri?.startsWith("/data") == true
+
+        val mapData = hashMapOf<String, Any>(
+            "student_id" to stId!!,
+            "name" to mName,
+            "email" to mEmail,
+            "phone" to mPhone,
+            "total_credits" to totCredit,
+            "dept_name" to mDept!!,
+            "subjects" to subjects!!
+        )
+
+        if (isLocalFile) {
+            val profileFile = mProfile?.let { File(it) }
+
+            val formData = MultipartBody.Builder().setType(MultipartBody.FORM).apply {
+                addFormDataPart("profile_id", profileId!!)
+                addFormDataPart("title", proTitle)
+                addFormDataPart("description", proDesc)
+                addPart(
+                    MultipartBody.Part.createFormData(
+                        "my_file",
+                        profileFile?.name,
+                        ProgressTracker(profileFile!!, object : ProgressTracker.UploadCallBack {
+                            override fun onProgressUpdate(percentage: Int) {
+                                runOnUiThread {
+                                    binding.progressBar.progress = percentage
+                                    binding.progressValue.text = "$percentage%"
+                                }
+                            }
+
+                            override fun onError() {
+                                runOnUiThread {
+                                    binding.progressBar.visibility = View.GONE
+                                    binding.progressValue.visibility = View.GONE
+                                }
+                            }
+
+                            override fun onFinish() {
+                                runOnUiThread {
+                                    binding.progressBar.visibility = View.GONE
+                                    binding.progressValue.visibility = View.GONE
+                                    binding.projectTitle.text.clear()
+                                    binding.proDescription.text.clear()
+                                    binding.userNameET.text.clear()
+                                    binding.userEmailET.text.clear()
+                                    binding.userMobileET.text.clear()
+                                    binding.creditET.text.clear()
+                                    mProfileUri = null
+                                    binding.profilePic.setImageResource(R.drawable.avatar)
+                                }
+                            }
+                        })
+                    )
+                )
+            }.build()
+
+            lifecycleScope.launch {
+                try {
+                    val uploadResponse = RetrofitClient.retrofit.uploadFile(formData.parts())
+                    val saveResponse = RetrofitClient.retrofit.updateStudents(mapData)
+
+                    saveSuccess(saveResponse)
+                    success(uploadResponse)
+
+                    HomeActivity.shouldRefresh = true
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        } else {
+            val profileMap = hashMapOf<String, Any?>(
+                "id" to profileId,
+                "project_title" to proTitle,
+                "project_desc" to proDesc,
+                "photoUrl" to mPic
+            )
+
+            lifecycleScope.launch {
+                try {
+                    RetrofitClient.retrofit.updateProfile(profileMap)
+                    val response = RetrofitClient.retrofit.updateStudents(mapData)
+
+                    saveSuccess(response)
+                    success(response)
+
+                    HomeActivity.shouldRefresh = true
+
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    binding.progressBar.visibility = View.GONE
+                    binding.progressValue.visibility = View.GONE
+                }
+            }
+        }
+    }
+
+
+//    private fun updateInfo(stId: Int?,profileId: String?,mName: String, mEmail: String, mPhone: String, totCredit: Int,mDept: String?,subjects: List<Int>?, proTitle: String, proDesc: String, mProfile:String?, success: (ResultResponse) -> Unit, saveSuccess: (ResultResponse)->Unit){
+//
+//        binding.progressBar.visibility = View.VISIBLE
+//        binding.progressValue.visibility = View.VISIBLE
+//
+//        //students_profile
+//
+//        val formData = MultipartBody.Builder().apply {
+//            setType(MultipartBody.FORM)//kon type er input..form naki raw
+//
+//            addFormDataPart("profile_id",profileId!!)
+//            addFormDataPart("title",proTitle)
+//            addFormDataPart("description",proDesc)
+//
+//
+//
+//
+//            val isLocalFile = mProfileUri?.startsWith("/storage") == true || mProfileUri?.startsWith("/data") == true
+//
+//            if (isLocalFile){
+//
+//                val profileFile = mProfile?.let {
+//                    File(it)
+//                }
+//
+//                addPart(
+//                    MultipartBody.Part.createFormData("my_file",profileFile?.name,
+//                        ProgressTracker(profileFile!!,object : ProgressTracker.UploadCallBack{
+//                    override fun onProgressUpdate(percentage: Int) {
+//                        runOnUiThread {
+//                            binding.progressBar.progress = percentage
+//                            binding.progressValue.text = "$percentage%"
+//                        }
+//
+//                    }
+//
+//                    override fun onError() {
+//                        runOnUiThread {
+//                            binding.progressBar.visibility = View.GONE
+//                            binding.progressValue.visibility = View.GONE
+//                        }
+//                    }
+//
+//                    override fun onFinish() {
+//                        runOnUiThread {
+//                            binding.progressBar.visibility = View.GONE
+//                            binding.progressValue.visibility = View.GONE
+//
+//                            binding.projectTitle.text.clear()
+//                            binding.proDescription.text.clear()
+//
+//                            binding.userNameET.text.clear()
+//                            binding.userEmailET.text.clear()
+//                            binding.userMobileET.text.clear()
+//                            binding.creditET.text.clear()
+//
+//                            mProfileUri = null
+//                            binding.profilePic.setImageResource(R.drawable.avatar)
+//
+//                        }
+//                    }
+//                })
+//                    ))
+//            }else{
+//                Toast.makeText(this@StudentsDetailsActivity,"$mPic",Toast.LENGTH_SHORT).show()
+//
+//                binding.progressBar.visibility = View.GONE
+//                binding.progressValue.visibility = View.GONE
+//
+//                val profileMap = HashMap<String,Any?>().apply {
+//                    put("id",profileId)
+//                    put("project_title",proTitle)
+//                    put("project_desc",proDesc)
+//                    put("photoUrl",mPic)
+//                }
+//
+//                val mapData = HashMap<String,Any>().apply {
+//                    put("student_id",stId!!)
+//                    put("name",mName)
+//                    put("email",mEmail)
+//                    put("phone",mPhone)
+//                    put("total_credits",totCredit)
+//                    put("dept_name",mDept!!)
+//                    put("subjects",subjects!!)
+//                }
+//
+//
+//                lifecycleScope.launch {
+//                    RetrofitClient.retrofit.updateProfile(profileMap)
+//
+//                   RetrofitClient.retrofit.updateStudents(mapData)
+//                }
+//
+//
+//
+//
+//
+//            }
+//
+//        }.build()
+//
+//
+//
+//
+//        lifecycleScope.launch {
+//            try {
+//                val uploadResponse: ResultResponse = RetrofitClient.retrofit.uploadFile(formData.parts())
+//
+//
+//                val mapData = HashMap<String,Any>().apply {
+//                    put("student_id",stId!!)
+//                    put("name",mName)
+//                    put("email",mEmail)
+//                    put("phone",mPhone)
+//                    put("total_credits",totCredit)
+//                    put("dept_name",mDept!!)
+//                    put("subjects",subjects!!)
+//                }
+//
+//                val saveResponse = RetrofitClient.retrofit.updateStudents(mapData)
+//                saveSuccess(saveResponse)
+//
+//
+//                success(uploadResponse)
+//
+//                HomeActivity.shouldRefresh = true
+//
+//
+//            } catch (e: Exception) {
+//                e.printStackTrace()
+//            }
+//        }
+//    }
+
+    //for image
+    @RequiresApi(Build.VERSION_CODES.O)
+    private val startForProfileImageResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
+        val resultCode = result.resultCode
+        val data = result.data
+
+        if (resultCode == Activity.RESULT_OK) {
+            // Image Uri will not be null for RESULT_OK
+            val fileUri = data?.data
+            //this below code portion was not given in the above same function for that we faced error
+            if (fileUri != null) {
+                mProfileUri = getRealPathFromUri(fileUri)
+                Toast.makeText(this, "Image path: $mProfileUri", Toast.LENGTH_SHORT).show()
+                Log.d("IMAGE_PATH", "Storage path: $mProfileUri")
+                if (mProfileUri != null) {
+                    binding.profilePic.setImageURI(fileUri)
+                } else {
+                    Toast.makeText(this, "Failed to get image path", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(this, "No image selected", Toast.LENGTH_SHORT).show()
+            }
+        } else if (resultCode == ImagePicker.RESULT_ERROR) {
+            Toast.makeText(this, ImagePicker.getError(data), Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Task Cancelled", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun getRealPathFromUri(contentUri: Uri): String? {
+        var result: String? = null
+        val cursor = contentResolver.query(contentUri, null, null, null, null)
+        if (cursor == null) {
+            result = contentUri.path
+        } else {
+            cursor.moveToFirst()
+            val idx = cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA)
+            result = cursor.getString(idx)
+            cursor.close()
+        }
+
+        // Debug the result
+        Log.d("FileUploadActivity", "Real Path: $result")
+        return result
     }
 }
