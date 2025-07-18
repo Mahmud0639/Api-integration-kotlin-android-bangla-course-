@@ -13,9 +13,15 @@ import com.squareup.picasso.Picasso
 class StudentsAdapter(var items: ArrayList<Students>):RecyclerView.Adapter<StudentsAdapter.StudentViewHolder>() {
 
     private lateinit var onViewOrEditListener: (Students) -> Unit
+    private lateinit var onDeleteClickListener: (Students) -> Unit
 
      fun setOnViewOrEditListener(action: (Students)->Unit){
         onViewOrEditListener = action
+    }
+
+    //delete Button
+    fun setOnDeleteClickListener(action: (Students)->Unit){
+        onDeleteClickListener = action
     }
 
 
@@ -47,6 +53,10 @@ class StudentsAdapter(var items: ArrayList<Students>):RecyclerView.Adapter<Stude
         init {
             binding.viewOrEditBtn.setOnClickListener {
                 onViewOrEditListener(items[adapterPosition])
+            }
+
+            binding.deleteBtn.setOnClickListener {
+                onDeleteClickListener(items[adapterPosition])
             }
         }
 

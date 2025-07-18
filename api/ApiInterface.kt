@@ -7,6 +7,7 @@ import okhttp3.MultipartBody
 import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -34,5 +35,19 @@ interface ApiInterface {
 
     @PUT(ApiEndPoints.UPLOADS)
     suspend fun updateProfile(@Body reqBody: Map<String, Any?>):ResultResponse
+
+    /* If your API requires a body, use @HTTP with hasBody = true. ✅
+   If your API only needs an ID as a query parameter, use @DELETE with @Query.*/
+
+    /*@DELETE(AllApi.USER)
+    suspend fun deleteUser(@Query("id") userId: Int): retrofit2.Response<ResultModel>*/
+
+
+    @HTTP(method = "DELETE", path = ApiEndPoints.USER, hasBody = true)
+    suspend fun deleteStudent(@Body body: Map<String, Any?>):ResultResponse
+
+
+    @HTTP(method = "DELETE", path = ApiEndPoints.UPLOADS, hasBody = true)
+    suspend fun deleteProfile(@Body body: Map<String, Any?>):ResultResponse
 
 }
