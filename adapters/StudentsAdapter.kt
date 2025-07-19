@@ -2,15 +2,21 @@ package com.manuni.hello_world.api_integration.adapters
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.widget.Filter
+import android.widget.Filterable
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import com.manuni.hello_world.R
 import com.manuni.hello_world.api_integration.api.ApiEndPoints
 import com.manuni.hello_world.api_integration.models.Students
+import com.manuni.hello_world.api_integration.search_filter.StudentFilter
 import com.manuni.hello_world.databinding.ThesisCardItemBinding
 import com.squareup.picasso.Picasso
 
-class StudentsAdapter(var items: ArrayList<Students>):RecyclerView.Adapter<StudentsAdapter.StudentViewHolder>() {
+class StudentsAdapter(var items: ArrayList<Students>):RecyclerView.Adapter<StudentsAdapter.StudentViewHolder>(),Filterable {
+
+    private var filterList = items
+    private var studentFilter: StudentFilter? = null
 
     private lateinit var onViewOrEditListener: (Students) -> Unit
     private lateinit var onDeleteClickListener: (Students) -> Unit
@@ -60,5 +66,12 @@ class StudentsAdapter(var items: ArrayList<Students>):RecyclerView.Adapter<Stude
             }
         }
 
+    }
+
+    override fun getFilter(): Filter {
+        if (studentFilter == null){
+            studentFilter = StudentFilter(this,filterList)
+        }
+        return studentFilter!!
     }
 }
